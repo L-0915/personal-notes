@@ -2,6 +2,7 @@
 
 **个人学术文献管理与笔记软件** — 一款"小而美"的桌面应用，专为研究者设计。
 
+[![GitHub Stars](https://img.shields.io/github/stars/L-0915/personal-notes?style=social)](https://github.com/L-0915/personal-notes/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Electron](https://img.shields.io/badge/Electron-41-47848F?logo=electron)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
@@ -263,7 +264,3 @@ scholar-note/
 ## License
 
 [MIT](LICENSE)
-
----
-
-**用 ScholarNote，把更多时间留给思考，而不是折腾工具。**
