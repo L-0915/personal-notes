@@ -264,3 +264,9 @@ scholar-note/
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=L-0915/personal-notes&type=Date)](https://star-history.com/#L-0915/personal-notes&Date)
