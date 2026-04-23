@@ -1,0 +1,32 @@
+{
+  "appId": "com.scholarnote.app",
+  "productName": "ScholarNote",
+  "forceCodeSigning": false,
+  "directories": {
+    "output": "../ScholarNote-Release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "node_modules/better-sqlite3",
+      "to": "node_modules/better-sqlite3"
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "signAndEditExecutable": false
+  },
+  "mac": {
+    "target": ["dmg"]
+  },
+  "linux": {
+    "target": ["AppImage"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}
