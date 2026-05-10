@@ -31,10 +31,11 @@ const electronAPI = {
 
   // -- Local file import ----------------------------------------------------
   importLocalMd: () => ipcRenderer.invoke('import:localMd'),
-  createNote: (title: string) => ipcRenderer.invoke('file:createNote', title),
+  createNote: (title: string, folderPath?: string) => ipcRenderer.invoke('file:createNote', title, folderPath),
 
   // -- File watcher ---------------------------------------------------------
   deleteFile: (filePath: string) => ipcRenderer.invoke('file:delete', filePath),
+  renameFile: (oldPath: string, newName: string) => ipcRenderer.invoke('file:rename', oldPath, newName),
   showInExplorer: (filePath: string) => ipcRenderer.invoke('file:showInExplorer', filePath),
   startWatcher: (vaultPath: string) => ipcRenderer.invoke('watcher:start', vaultPath),
   stopWatcher: () => ipcRenderer.invoke('watcher:stop'),

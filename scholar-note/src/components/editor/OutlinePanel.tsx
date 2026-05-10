@@ -31,14 +31,21 @@ function extractHeadings(content: string): Heading[] {
 
 interface OutlinePanelProps {
   content: string;
+  onClose?: () => void;
 }
 
-export function OutlinePanel({ content }: OutlinePanelProps) {
+export function OutlinePanel({ content, onClose }: OutlinePanelProps) {
   const headings = useMemo(() => extractHeadings(content), [content]);
 
   if (headings.length === 0) {
     return (
       <div className="outline-panel">
+        <div className="outline-header">
+          <span>大纲</span>
+          {onClose && (
+            <button className="outline-close-btn" onClick={onClose} title="关闭大纲">✕</button>
+          )}
+        </div>
         <div className="outline-empty">暂无标题</div>
       </div>
     );
@@ -53,7 +60,12 @@ export function OutlinePanel({ content }: OutlinePanelProps) {
 
   return (
     <div className="outline-panel">
-      <div className="outline-header">大纲</div>
+      <div className="outline-header">
+        <span>大纲</span>
+        {onClose && (
+          <button className="outline-close-btn" onClick={onClose} title="关闭大纲">✕</button>
+        )}
+      </div>
       <ul className="outline-list">
         {headings.map((h, i) => (
           <li

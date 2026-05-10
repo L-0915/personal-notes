@@ -3,6 +3,7 @@ import { useNoteStore } from '@/stores/noteStore';
 import { useTagStore } from '@/stores/tagStore';
 import { useUiStore, type SortBy } from '@/stores/uiStore';
 import { StarRating } from '@/components/common/StarRating';
+import { ContextMenu, type MenuAction } from '@/components/sidebar/ContextMenu';
 
 interface TreeNode {
   name: string;
@@ -55,6 +56,12 @@ function sortNodes(nodes: TreeNode[], sortBy: SortBy, asc: boolean, paperMap: Ma
   });
 }
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  node: TreeNode;
+}
+
 export function FileTree() {
   const papers = useNoteStore((s) => s.papers);
   const currentPaper = useNoteStore((s) => s.currentPaper);
@@ -79,6 +86,11 @@ export function FileTree() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  const [newFileParent, setNewFileParent] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState('');
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   // Build a map from filePath to paper data for quick lookups
   const paperMap = new Map(papers.map((p) => [p.filePath, p]));
@@ -118,7 +130,6 @@ export function FileTree() {
     if (paper) {
       setCurrentPaper(paper);
     } else {
-      // File not in database — create a temporary paper object so it can still be opened
       setCurrentPaper({
         id: -1,
         title: node.name,
@@ -173,6 +184,123 @@ export function FileTree() {
     loadTree();
   };
 
+  const handleCreateFile = async () => {
+    const name = newFileName.trim();
+    if (!name || !newFileParent) return;
+    const result = await window.electronAPI.createNote(name, newFileParent);
+    if (result.success) {
+      setNewFileName('');
+      setNewFileParent(null);
+      loadTree();
+      const updated = await window.electronAPI.dbGetAllPapers();
+      setPapers(updated);
+    }
+  };
+
+  const handleRename = async (nodePath: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      setRenamingPath(null);
+      return;
+    }
+    const node = findNode(tree, nodePath);
+    if (!node) return;
+
+    if (node.type === 'file') {
+      const result = await window.electronAPI.renameFile(nodePath, trimmed);
+      if (result.success) {
+        loadTree();
+        const updated = await window.electronAPI.dbGetAllPapers();
+        setPapers(updated);
+        if (currentPaper?.filePath === nodePath) {
+          const newPaper = updated.find((p: { title: string }) => p.title === trimmed);
+          if (newPaper) {
+            setCurrentPaper(newPaper);
+            try {
+              const content = await window.electronAPI.readFile(newPaper.filePath);
+              if (typeof content === 'string') setCurrentContent(content);
+            } catch { /* ignore */ }
+          }
+        }
+      }
+    } else {
+      const result = await window.electronAPI.renameFolder(nodePath, trimmed);
+      if (result.success) {
+        loadTree();
+        const updated = await window.electronAPI.dbGetAllPapers();
+        setPapers(updated);
+      }
+    }
+    setRenamingPath(null);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, node: TreeNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, node });
+  };
+
+  const handleContextAction = async (action: string, node: TreeNode) => {
+    switch (action) {
+      case 'rename':
+        setRenamingPath(node.path);
+        setRenameValue(node.name);
+        break;
+      case 'delete-file': {
+        const paper = paperMap.get(node.path);
+        if (paper) setConfirmDeleteId(paper.id);
+        break;
+      }
+      case 'delete-folder':
+        if (node.path) {
+          await window.electronAPI.deleteFolder(node.path);
+          loadTree();
+        }
+        break;
+      case 'new-file':
+        setNewFileParent(node.path);
+        setNewFileName('');
+        toggleFolder(node.path);
+        break;
+      case 'new-folder':
+        setNewFolderParent(node.path);
+        setNewFolderName('');
+        toggleFolder(node.path);
+        break;
+      case 'show-in-explorer':
+        await window.electronAPI.showInExplorer(node.path);
+        break;
+    }
+  };
+
+  const getContextMenuActions = (node: TreeNode): MenuAction[] => {
+    if (node.type === 'folder') {
+      return [
+        { label: '新建笔记', icon: '📄', onClick: () => handleContextAction('new-file', node) },
+        { label: '新建子文件夹', icon: '📁', onClick: () => handleContextAction('new-folder', node) },
+        { label: '重命名', icon: '✏️', onClick: () => handleContextAction('rename', node) },
+        { label: '在资源管理器中显示', icon: '📂', onClick: () => handleContextAction('show-in-explorer', node) },
+        { label: '删除文件夹', icon: '🗑️', onClick: () => handleContextAction('delete-folder', node), danger: true },
+      ];
+    }
+    return [
+      { label: '重命名', icon: '✏️', onClick: () => handleContextAction('rename', node) },
+      { label: '在资源管理器中显示', icon: '📂', onClick: () => handleContextAction('show-in-explorer', node) },
+      { label: '删除', icon: '🗑️', onClick: () => handleContextAction('delete-file', node), danger: true },
+    ];
+  };
+
+  const findNode = (nodes: TreeNode[], targetPath: string): TreeNode | null => {
+    for (const n of nodes) {
+      if (n.path === targetPath) return n;
+      if (n.children) {
+        const found = findNode(n.children, targetPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   const hasFiles = (nodes: TreeNode[]): boolean => {
     return nodes.some((n) => {
       if (filteredPaths) return n.type === 'file' && filteredPaths.has(n.path);
@@ -182,24 +310,41 @@ export function FileTree() {
 
   const renderNode = (node: TreeNode, depth: number) => {
     if (node.type === 'folder') {
-      // Check if folder has matching files
       if (filteredPaths && node.children && !hasFiles(node.children)) return null;
 
       const isExpanded = expandedFolders.has(node.path);
+      const isRenaming = renamingPath === node.path;
       return (
         <li key={node.path}>
           <div
             className="folder-item"
             style={{ paddingLeft: 12 + depth * 16 }}
             onClick={() => toggleFolder(node.path)}
+            onContextMenu={(e) => handleContextMenu(e, node)}
           >
             <span className="folder-arrow">{isExpanded ? '▾' : '▸'}</span>
             <span className="folder-icon">📁</span>
-            <span className="folder-name">{node.name}</span>
+            {isRenaming ? (
+              <input
+                className="rename-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename(node.path, renameValue);
+                  if (e.key === 'Escape') setRenamingPath(null);
+                  e.stopPropagation();
+                }}
+                onBlur={() => handleRename(node.path, renameValue)}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            ) : (
+              <span className="folder-name">{node.name}</span>
+            )}
             <button
               className="btn-folder-action"
-              onClick={(e) => { e.stopPropagation(); setNewFolderParent(node.path); setNewFolderName(''); }}
-              title="新建子文件夹"
+              onClick={(e) => { e.stopPropagation(); setNewFileParent(node.path); setNewFileName(''); }}
+              title="新建笔记"
             >
               +
             </button>
@@ -217,38 +362,58 @@ export function FileTree() {
     if (filteredPaths && !filteredPaths.has(node.path)) return null;
 
     const paper = paperMap.get(node.path);
+    const isRenaming = renamingPath === node.path;
     return (
       <li
         key={node.path}
         className={`file-item${currentPaper?.filePath === node.path ? ' active' : ''}`}
         style={{ paddingLeft: 12 + depth * 16 }}
         onClick={() => handleSelect(node)}
+        onContextMenu={(e) => handleContextMenu(e, node)}
       >
-        <span className="file-title">{node.name}</span>
-        <div className="file-item-actions">
-          {paper && (
-            <>
-              <button
-                className={`btn-pin${paper.pinned ? ' active' : ''}`}
-                onClick={(e) => { e.stopPropagation(); togglePin(paper.id, !!paper.pinned); }}
-                title={paper.pinned ? '取消置顶' : '置顶'}
-              >
-                📌
-              </button>
-              <StarRating
-                rating={paper.rating}
-                onChange={(r) => updatePaperRating(paper.id, r)}
-              />
-            </>
-          )}
-          <button
-            className="btn-delete"
-            onClick={(e) => { e.stopPropagation(); paper && setConfirmDeleteId(paper.id); }}
-            title="删除笔记"
-          >
-            ×
-          </button>
-        </div>
+        {isRenaming ? (
+          <input
+            className="rename-input"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename(node.path, renameValue);
+              if (e.key === 'Escape') setRenamingPath(null);
+              e.stopPropagation();
+            }}
+            onBlur={() => handleRename(node.path, renameValue)}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        ) : (
+          <span className="file-title">{node.name}</span>
+        )}
+        {!isRenaming && (
+          <div className="file-item-actions">
+            {paper && (
+              <>
+                <button
+                  className={`btn-pin${paper.pinned ? ' active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); togglePin(paper.id, !!paper.pinned); }}
+                  title={paper.pinned ? '取消置顶' : '置顶'}
+                >
+                  📌
+                </button>
+                <StarRating
+                  rating={paper.rating}
+                  onChange={(r) => updatePaperRating(paper.id, r)}
+                />
+              </>
+            )}
+            <button
+              className="btn-delete"
+              onClick={(e) => { e.stopPropagation(); paper && setConfirmDeleteId(paper.id); }}
+              title="删除笔记"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {paper && confirmDeleteId === paper.id && (
           <div className="delete-confirm" onClick={(e) => e.stopPropagation()}>
             <span>确定删除？</span>
@@ -316,9 +481,36 @@ export function FileTree() {
         </div>
       )}
 
-      <ul className="file-tree">
+      {newFileParent !== null && (
+        <div className="new-folder-input">
+          <input
+            type="text"
+            placeholder="笔记标题..."
+            value={newFileName}
+            onChange={(e) => setNewFileName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateFile();
+              if (e.key === 'Escape') { setNewFileParent(null); setNewFileName(''); }
+            }}
+            autoFocus
+          />
+          <button className="btn-primary btn-sm" onClick={handleCreateFile}>创建</button>
+          <button className="btn-secondary btn-sm" onClick={() => { setNewFileParent(null); setNewFileName(''); }}>取消</button>
+        </div>
+      )}
+
+      <ul className="file-tree" onContextMenu={(e) => e.preventDefault()}>
         {sortNodes(tree, sortBy, sortAsc, paperMap).map((node) => renderNode(node, 0))}
       </ul>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={getContextMenuActions(contextMenu.node)}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </>
   );
 }

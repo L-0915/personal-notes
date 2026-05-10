@@ -7,7 +7,6 @@ import type { MarkdownEditorHandle } from '@/components/editor/MarkdownEditor';
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import type { MarkdownPreviewHandle } from '@/components/editor/MarkdownPreview';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
-import { StatusBar } from '@/components/layout/StatusBar';
 import { OutlinePanel } from '@/components/editor/OutlinePanel';
 
 const URL_DOI_PATTERNS = [
@@ -40,6 +39,7 @@ export function AppLayout() {
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const showOutline = useUiStore((s) => s.showOutline);
+  const toggleOutline = useUiStore((s) => s.toggleOutline);
   const viewMode = useUiStore((s) => s.viewMode);
   const setViewMode = useUiStore((s) => s.setViewMode);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -204,7 +204,7 @@ export function AppLayout() {
                   onNoteLinkClick={handleNoteLinkClick}
                   onScroll={handlePreviewScroll}
                 />
-                {showOutline && <OutlinePanel content={currentContent} />}
+                {showOutline && <OutlinePanel content={currentContent} onClose={() => toggleOutline()} />}
               </div>
             )}
           </>
@@ -215,7 +215,6 @@ export function AppLayout() {
             <div className="editor-empty-hint">Ctrl+N 导入 | 拖拽 .md 文件导入</div>
           </div>
         )}
-        <StatusBar />
       </div>
     </div>
   );

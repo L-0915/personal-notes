@@ -15,7 +15,7 @@ export interface ElectronAPI {
   importPaper: (urlOrDoi: string) => Promise<{ success: boolean; notePath?: string; error?: string }>;
   openLocalFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   importLocalMd: () => Promise<{ success: boolean; imported: Array<{ title: string; filePath: string }>; errors: string[] }>;
-  createNote: (title: string) => Promise<{ success: boolean; notePath?: string; error?: string }>;
+  createNote: (title: string, folderPath?: string) => Promise<{ success: boolean; notePath?: string; error?: string }>;
   startWatcher: (vaultPath: string) => Promise<void>;
   stopWatcher: () => Promise<void>;
   onFileChanged: (callback: (filePath: string) => void) => () => void;
@@ -24,6 +24,7 @@ export interface ElectronAPI {
   selectVault: () => Promise<string | null>;
   getVaultPath: () => Promise<string>;
   deleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  renameFile: (oldPath: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   showInExplorer: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   setVaultPath: (newPath: string) => Promise<{ success: boolean; error?: string }>;
   readSettings: () => Promise<Record<string, unknown>>;

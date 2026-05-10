@@ -264,20 +264,25 @@ export function registerFileIPC(getVaultPath: () => string, db: DatabaseType): v
     },
   );
 
-  // file:createNote — create a new blank note
+  // file:createNote — create a new blank note (optionally in a specific folder)
   ipcMain.handle(
     'file:createNote',
-    async (_event, title: string): Promise<{ success: boolean; notePath?: string; error?: string }> => {
+    async (_event, title: string, folderPath?: string): Promise<{ success: boolean; notePath?: string; error?: string }> => {
       try {
         const vaultPath = getVaultPath();
         if (!vaultPath) return { success: false, error: '仓库路径未配置' };
         if (!title.trim()) return { success: false, error: '标题不能为空' };
 
         const slug = slugify(title);
-        const papersDir = path.join(vaultPath, 'papers');
-        await fs.promises.mkdir(papersDir, { recursive: true });
+        let targetDir: string;
+        if (folderPath && isPathInVault(folderPath, vaultPath)) {
+          targetDir = folderPath;
+        } else {
+          targetDir = path.join(vaultPath, 'papers');
+        }
+        await fs.promises.mkdir(targetDir, { recursive: true });
 
-        const notePath = uniqueFilePath(papersDir, slug, '.md');
+        const notePath = uniqueFilePath(targetDir, slug, '.md');
         const noteContent = createNoteFromTemplate({ title: title.trim(), tags: [], reading_status: 'to-read' });
         await fs.promises.writeFile(notePath, noteContent, 'utf-8');
 
@@ -302,6 +307,38 @@ export function registerFileIPC(getVaultPath: () => string, db: DatabaseType): v
         return { success: true, notePath };
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : '创建失败' };
+      }
+    },
+  );
+
+  // file:rename — rename a note file and update database
+  ipcMain.handle(
+    'file:rename',
+    async (_event, oldPath: string, newName: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const vaultPath = getVaultPath();
+        if (!vaultPath) return { success: false, error: '仓库路径未配置' };
+        if (!isPathInVault(oldPath, vaultPath)) return { success: false, error: '访问被拒绝' };
+        if (!newName.trim()) return { success: false, error: '名称不能为空' };
+
+        const dir = path.dirname(oldPath);
+        const newSlug = slugify(newName.trim());
+        const newPath = path.join(dir, `${newSlug}.md`);
+
+        if (newPath !== oldPath && fs.existsSync(newPath)) {
+          return { success: false, error: '同名文件已存在' };
+        }
+
+        await fs.promises.rename(oldPath, newPath);
+
+        // Update database
+        db.prepare(
+          'UPDATE papers SET filePath = ?, slug = ?, title = ? WHERE filePath = ?'
+        ).run(newPath, newSlug, newName.trim(), oldPath);
+
+        return { success: true };
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : '重命名失败' };
       }
     },
   );
