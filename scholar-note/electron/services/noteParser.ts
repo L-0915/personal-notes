@@ -84,10 +84,7 @@ export function createNoteFromTemplate(meta: TemplateMeta): string {
     '',
     '## 相关论文',
     '',
-    '```mermaid',
-    'graph LR',
-    `  A["${meta.title}"]`,
-    '```',
+    `<!-- 粘贴本地论文路径，如：[论文标题](D:\\path\\to\\paper.pdf) -->`,
     '',
   ].join('\n');
 
