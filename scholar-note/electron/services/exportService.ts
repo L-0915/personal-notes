@@ -12,6 +12,9 @@ import katex from '@traptitech/markdown-it-katex';
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   AlignmentType, BorderStyle, ExternalHyperlink,
+  Table, TableRow, TableCell, WidthType,
+  Math, MathRun, MathFraction, MathSuperScript, MathSubScript,
+  MathSubSuperScript, MathRadical,
 } from 'docx';
 
 type MdToken = ReturnType<MarkdownIt['parse']>[number];
@@ -117,7 +120,7 @@ export async function exportToPdf(htmlContent: string): Promise<Buffer> {
 
 export async function exportToDocx(markdown: string, title: string): Promise<Buffer> {
   const tokens = md.parse(markdown, {});
-  const children: Paragraph[] = [];
+  const children: (Paragraph | Table)[] = [];
 
   let i = 0;
   while (i < tokens.length) {
@@ -232,10 +235,23 @@ export async function exportToDocx(markdown: string, title: string): Promise<Buf
       continue;
     }
 
+    if (token.type === 'math_block') {
+      const mathElements = latexToMathRuns(token.content.trim());
+      if (mathElements.length > 0) {
+        children.push(new Paragraph({
+          children: [new Math({ children: mathElements })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 120, after: 120 },
+        }));
+      }
+      i++;
+      continue;
+    }
+
     if (token.type === 'table_open') {
       const tableResult = parseTable(tokens, i);
       i = tableResult.nextIndex;
-      children.push(...tableResult.paragraphs);
+      children.push(tableResult.table);
       continue;
     }
 
@@ -278,8 +294,10 @@ function headingLevel(level: number): (typeof HeadingLevel)[keyof typeof Heading
   return map[level] ?? HeadingLevel.HEADING_2;
 }
 
-function inlineTokensToRuns(tokens: MdToken[]): (TextRun | ExternalHyperlink)[] {
-  const runs: (TextRun | ExternalHyperlink)[] = [];
+type InlineRun = TextRun | ExternalHyperlink | Math;
+
+function inlineTokensToRuns(tokens: MdToken[]): InlineRun[] {
+  const runs: InlineRun[] = [];
 
   for (const token of tokens) {
     if (token.type === 'text' || token.type === 'text_special') {
@@ -291,6 +309,11 @@ function inlineTokensToRuns(tokens: MdToken[]): (TextRun | ExternalHyperlink)[] 
         size: 20,
         shading: { type: 'clear' as unknown as undefined, fill: 'f6f8fa' },
       }));
+    } else if (token.type === 'math_inline') {
+      const mathElements = latexToMathRuns(token.content.trim());
+      if (mathElements.length > 0) {
+        runs.push(new Math({ children: mathElements }));
+      }
     } else if (token.type === 'softbreak') {
       runs.push(new TextRun({ text: ' ', break: 1 }));
     } else if (token.type === 'hardbreak') {
@@ -331,18 +354,18 @@ function inlineTokensToRuns(tokens: MdToken[]): (TextRun | ExternalHyperlink)[] 
 }
 
 interface ListParseResult {
-  runs: (TextRun | ExternalHyperlink)[][];
+  runs: InlineRun[][];
   nextIndex: number;
 }
 
 function parseListItems(tokens: MdToken[], startIdx: number, closeType: string): ListParseResult {
-  const items: (TextRun | ExternalHyperlink)[][] = [];
+  const items: InlineRun[][] = [];
   let i = startIdx + 1; // skip list_open
 
   while (i < tokens.length && tokens[i].type !== closeType) {
     if (tokens[i].type === 'list_item_open') {
       i++; // skip list_item_open
-      const itemRuns: (TextRun | ExternalHyperlink)[] = [];
+      const itemRuns: InlineRun[] = [];
       while (i < tokens.length && tokens[i].type !== 'list_item_close') {
         if (tokens[i].type === 'paragraph_open') {
           i++;
@@ -367,7 +390,7 @@ function parseListItems(tokens: MdToken[], startIdx: number, closeType: string):
 }
 
 interface TableParseResult {
-  paragraphs: Paragraph[];
+  table: Table;
   nextIndex: number;
 }
 
@@ -382,7 +405,6 @@ function parseTable(tokens: MdToken[], startIdx: number): TableParseResult {
       while (i < tokens.length && tokens[i].type !== 'tr_close') {
         if (tokens[i].type === 'td_open' || tokens[i].type === 'th_open') {
           i++;
-          // Collect cell content
           let cellText = '';
           while (i < tokens.length && tokens[i].type !== 'td_close' && tokens[i].type !== 'th_close') {
             if (tokens[i].content) cellText += tokens[i].content;
@@ -402,16 +424,311 @@ function parseTable(tokens: MdToken[], startIdx: number): TableParseResult {
   }
   i++; // skip table_close
 
-  // Convert rows to paragraphs (simple approach: tab-separated for now)
-  const paragraphs: Paragraph[] = [];
-  for (const row of rows) {
-    const runs: TextRun[] = [];
-    for (let c = 0; c < row.length; c++) {
-      if (c > 0) runs.push(new TextRun({ text: '  |  ' }));
-      runs.push(new TextRun({ text: row[c] }));
-    }
-    paragraphs.push(new Paragraph({ children: runs, spacing: { after: 40 } }));
+  const colCount = rows[0]?.length || 1;
+  const colWidth = (9000 / colCount) | 0;
+  const cellBorders = {
+    top: { style: BorderStyle.SINGLE, size: 1, color: 'auto' },
+    bottom: { style: BorderStyle.SINGLE, size: 1, color: 'auto' },
+    left: { style: BorderStyle.SINGLE, size: 1, color: 'auto' },
+    right: { style: BorderStyle.SINGLE, size: 1, color: 'auto' },
+  };
+
+  const table = new Table({
+    rows: rows.map((row, rowIdx) => new TableRow({
+      children: row.map((cell) => new TableCell({
+        children: [new Paragraph({
+          children: [new TextRun({ text: cell, bold: rowIdx === 0 })],
+          spacing: { before: 40, after: 40 },
+        })],
+        width: { size: colWidth, type: WidthType.DXA },
+        borders: cellBorders,
+        shading: rowIdx === 0 ? { fill: 'f6f8fa' } : undefined,
+      })),
+    })),
+    width: { size: 100, type: WidthType.PERCENTAGE },
+  });
+
+  return { table, nextIndex: i };
+}
+
+// ---------------------------------------------------------------------------
+// LaTeX → docx Math converter
+// ---------------------------------------------------------------------------
+
+type MathElement = MathRun | MathFraction | MathSuperScript | MathSubScript | MathSubSuperScript | MathRadical | Math;
+
+const GREEK_LETTERS: Record<string, string> = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ',
+  epsilon: 'ε', varepsilon: 'ε', zeta: 'ζ', eta: 'η',
+  theta: 'θ', vartheta: 'ϑ', iota: 'ι', kappa: 'κ',
+  lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ',
+  pi: 'π', varpi: 'ϖ', rho: 'ρ', varrho: 'ϱ',
+  sigma: 'σ', varsigma: 'ς', tau: 'τ', upsilon: 'υ',
+  phi: 'φ', varphi: 'ϕ', chi: 'χ', psi: 'ψ', omega: 'ω',
+  Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ',
+  Xi: 'Ξ', Pi: 'Π', Sigma: 'Σ', Upsilon: 'Υ',
+  Phi: 'Φ', Psi: 'Ψ', Omega: 'Ω',
+};
+
+const LATEX_SYMBOLS: Record<string, string> = {
+  infty: '∞', pm: '±', mp: '∓', times: '×', cdot: '·',
+  div: '÷', le: '≤', leq: '≤', ge: '≥', geq: '≥',
+  ne: '≠', neq: '≠', approx: '≈', equiv: '≡', sim: '∼',
+  simeq: '≃', ll: '≪', gg: '≫', partial: '∂', nabla: '∇',
+  forall: '∀', exists: '∃', 'in': '∈', notin: '∉',
+  subset: '⊂', supset: '⊃', subseteq: '⊆', supseteq: '⊇',
+  cup: '∪', cap: '∩', emptyset: '∅', varnothing: '∅',
+  therefore: '∴', because: '∵', ldots: '…', cdots: '⋯',
+  vdots: '⋮', ddots: '⋱',
+  to: '→', rightarrow: '→', leftarrow: '←', gets: '←',
+  Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔',
+ leftrightarrow: '↔', mapsto: '↦',
+  leftharpoonup: '↼', leftharpoondown: '↽',
+  rightharpoonup: '⇀', rightharpoondown: '⇁',
+  quad: ' ', qquad: '  ',
+  ',': ' ', ':': ' ', ';': ' ',
+  '!': '', langle: '⟨', rangle: '⟩',
+  lfloor: '⌊', rfloor: '⌋', lceil: '⌈', rceil: '⌉',
+  vert: '|', Vert: '‖', '|': '‖',
+  dag: '†', ddag: '‡', degree: '°',
+  ell: 'ℓ', wp: '℘', Re: 'ℜ', Im: 'ℑ',
+  aleph: 'ℵ', hbar: 'ℏ',
+};
+
+function latexToMathRuns(latex: string): MathElement[] {
+  const parser = new LatexParser(latex.trim());
+  return parser.parse();
+}
+
+class LatexParser {
+  private pos = 0;
+  private src: string;
+
+  constructor(src: string) {
+    this.src = src;
   }
 
-  return { paragraphs, nextIndex: i };
+  parse(): MathElement[] {
+    return this.parseUntil('');
+  }
+
+  private parseUntil(endChar: string): MathElement[] {
+    const elements: MathElement[] = [];
+    while (this.pos < this.src.length) {
+      if (endChar && this.src[this.pos] === endChar) break;
+
+      const ch = this.src[this.pos];
+      if (ch === '\\') {
+        elements.push(this.parseCommand());
+      } else if (ch === '^') {
+        this.applySuperScript(elements);
+      } else if (ch === '_') {
+        this.applySubScript(elements);
+      } else if (ch === '{') {
+        this.pos++;
+        const inner = this.parseUntil('}');
+        this.pos++;
+        elements.push(inner.length === 1 ? inner[0] : new Math({ children: inner }));
+      } else if (ch === '}' || ch === '&') {
+        break;
+      } else if (ch === ' ' || ch === '\n' || ch === '\r' || ch === '\t') {
+        this.pos++;
+      } else {
+        elements.push(new MathRun(ch));
+        this.pos++;
+      }
+    }
+    return elements;
+  }
+
+  private parseCommand(): MathElement {
+    this.pos++; // skip '\'
+    let cmd = '';
+    while (this.pos < this.src.length && /[a-zA-Z]/.test(this.src[this.pos])) {
+      cmd += this.src[this.pos];
+      this.pos++;
+    }
+
+    if (cmd.length === 0 && this.pos < this.src.length) {
+      const ch = this.src[this.pos];
+      this.pos++;
+      return new MathRun(ch);
+    }
+
+    if (GREEK_LETTERS[cmd]) return new MathRun(GREEK_LETTERS[cmd]);
+    if (LATEX_SYMBOLS[cmd] !== undefined) return new MathRun(LATEX_SYMBOLS[cmd]);
+
+    switch (cmd) {
+      case 'frac': {
+        const num = this.parseArg();
+        const den = this.parseArg();
+        return new MathFraction({ numerator: num, denominator: den });
+      }
+      case 'dfrac': {
+        const num = this.parseArg();
+        const den = this.parseArg();
+        return new MathFraction({ numerator: num, denominator: den });
+      }
+      case 'sqrt': {
+        let degree: MathElement[] | undefined;
+        if (this.pos < this.src.length && this.src[this.pos] === '[') {
+          this.pos++;
+          degree = this.parseUntil(']');
+          this.pos++;
+        }
+        const content = this.parseArg();
+        return new MathRadical({ children: content, degree: degree || [] });
+      }
+      case 'sum': return new MathRun('∑');
+      case 'prod': return new MathRun('∏');
+      case 'coprod': return new MathRun('∐');
+      case 'int': return new MathRun('∫');
+      case 'iint': return new MathRun('∬');
+      case 'iiint': return new MathRun('∭');
+      case 'oint': return new MathRun('∮');
+      case 'bigcup': return new MathRun('⋃');
+      case 'bigcap': return new MathRun('⋂');
+      case 'bigoplus': return new MathRun('⨁');
+      case 'bigotimes': return new MathRun('⨂');
+      case 'text':
+      case 'mathrm':
+      case 'textrm':
+      case 'textbf':
+      case 'textit': {
+        if (this.pos < this.src.length && this.src[this.pos] === '{') {
+          this.pos++;
+          let text = '';
+          let depth = 1;
+          while (this.pos < this.src.length && depth > 0) {
+            if (this.src[this.pos] === '{') depth++;
+            else if (this.src[this.pos] === '}') { depth--; if (depth === 0) break; }
+            text += this.src[this.pos];
+            this.pos++;
+          }
+          this.pos++;
+          return new MathRun(text);
+        }
+        return new MathRun('');
+      }
+      case 'left':
+      case 'right':
+      case 'bigl':
+      case 'bigr':
+      case 'Bigl':
+      case 'Bigr':
+      case 'biggl':
+      case 'biggr':
+      case 'big':
+      case 'Big':
+      case 'bigg':
+      case 'Bigg': {
+        if (this.pos < this.src.length) {
+          if (this.src[this.pos] === '\\') {
+            this.pos++;
+            if (this.pos < this.src.length && !/[a-zA-Z]/.test(this.src[this.pos])) {
+              const ch = this.src[this.pos];
+              this.pos++;
+              return new MathRun(ch);
+            }
+            let delimCmd = '';
+            while (this.pos < this.src.length && /[a-zA-Z]/.test(this.src[this.pos])) {
+              delimCmd += this.src[this.pos];
+              this.pos++;
+            }
+            if (delimCmd === 'langle') return new MathRun('⟨');
+            if (delimCmd === 'rangle') return new MathRun('⟩');
+            if (delimCmd === 'lfloor') return new MathRun('⌊');
+            if (delimCmd === 'rfloor') return new MathRun('⌋');
+            if (delimCmd === 'lceil') return new MathRun('⌈');
+            if (delimCmd === 'rceil') return new MathRun('⌉');
+            return new MathRun('');
+          }
+          if (this.src[this.pos] === '.') { this.pos++; return new MathRun(''); }
+          const ch = this.src[this.pos];
+          this.pos++;
+          return new MathRun(ch);
+        }
+        return new MathRun('');
+      }
+      case 'begin': {
+        this.skipGroup();
+        const content = this.parseUntil('\\');
+        if (this.src.startsWith('end', this.pos)) {
+          this.pos += 3;
+          this.skipGroup();
+        }
+        return new Math({ children: content });
+      }
+      case 'overline':
+      case 'underline':
+      case 'hat':
+      case 'vec':
+      case 'bar':
+      case 'dot':
+      case 'ddot':
+      case 'tilde':
+      case 'widehat':
+      case 'overrightarrow':
+      case 'overleftarrow': {
+        const arg = this.parseArg();
+        return new Math({ children: arg });
+      }
+      case 'not': {
+        const next = this.parseArg();
+        return new Math({ children: [new MathRun('̸'), ...next] });
+      }
+      default:
+        return new MathRun('\\' + cmd + ' ');
+    }
+  }
+
+  private parseArg(): MathElement[] {
+    if (this.pos < this.src.length && this.src[this.pos] === '{') {
+      this.pos++;
+      const inner = this.parseUntil('}');
+      this.pos++;
+      return inner;
+    }
+    if (this.pos < this.src.length) {
+      if (this.src[this.pos] === '\\') return [this.parseCommand()];
+      const ch = this.src[this.pos];
+      this.pos++;
+      return [new MathRun(ch)];
+    }
+    return [];
+  }
+
+  private applySuperScript(elements: MathElement[]): void {
+    this.pos++;
+    const superContent = this.parseArg();
+    if (elements.length === 0) {
+      elements.push(new MathSuperScript({ children: [new MathRun('')], superScript: superContent }));
+      return;
+    }
+    const last = elements.pop()!;
+    elements.push(new MathSuperScript({ children: [last], superScript: superContent }));
+  }
+
+  private applySubScript(elements: MathElement[]): void {
+    this.pos++;
+    const subContent = this.parseArg();
+    if (elements.length === 0) {
+      elements.push(new MathSubScript({ children: [new MathRun('')], subScript: subContent }));
+      return;
+    }
+    const last = elements.pop()!;
+    elements.push(new MathSubScript({ children: [last], subScript: subContent }));
+  }
+
+  private skipGroup(): void {
+    if (this.pos < this.src.length && this.src[this.pos] === '{') {
+      let depth = 1;
+      this.pos++;
+      while (this.pos < this.src.length && depth > 0) {
+        if (this.src[this.pos] === '{') depth++;
+        else if (this.src[this.pos] === '}') depth--;
+        this.pos++;
+      }
+    }
+  }
 }
