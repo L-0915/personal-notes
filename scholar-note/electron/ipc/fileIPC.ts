@@ -109,16 +109,17 @@ export function registerFileIPC(getVaultPath: () => string, db: DatabaseType): v
     );
   });
 
-  // folder:create — create a new subfolder under papers/
+  // folder:create — create a new folder (accepts absolute or relative path)
   ipcMain.handle(
     'folder:create',
     async (_event, folderPath: string): Promise<{ success: boolean; error?: string }> => {
       try {
         const vaultPath = getVaultPath();
         if (!vaultPath) return { success: false, error: '仓库路径未配置' };
-        const papersDir = path.join(vaultPath, 'papers');
-        const fullPath = path.resolve(papersDir, folderPath);
-        if (!fullPath.startsWith(papersDir)) return { success: false, error: '访问被拒绝' };
+        const fullPath = path.isAbsolute(folderPath)
+          ? path.normalize(folderPath)
+          : path.resolve(path.join(vaultPath, 'papers'), folderPath);
+        if (!isPathInVault(fullPath, vaultPath)) return { success: false, error: '访问被拒绝' };
         await fs.promises.mkdir(fullPath, { recursive: true });
         return { success: true };
       } catch (error: unknown) {

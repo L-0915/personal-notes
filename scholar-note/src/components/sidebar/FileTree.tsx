@@ -269,6 +269,11 @@ export function FileTree() {
         setNewFolderName('');
         break;
       }
+      case 'new-subfolder':
+        setNewFolderParent(node.path);
+        setNewFolderName('');
+        toggleFolder(node.path);
+        break;
       case 'show-in-explorer':
         await window.electronAPI.showInExplorer(node.path);
         break;
@@ -280,6 +285,7 @@ export function FileTree() {
       return [
         { label: '新建笔记', icon: '📄', onClick: () => handleContextAction('new-file', node) },
         { label: '新建文件夹', icon: '📁', onClick: () => handleContextAction('new-folder', node) },
+        { label: '新建子文件夹', icon: '📂', onClick: () => handleContextAction('new-subfolder', node) },
         { label: '重命名', icon: '✏️', onClick: () => handleContextAction('rename', node) },
         { label: '在资源管理器中显示', icon: '📂', onClick: () => handleContextAction('show-in-explorer', node) },
         { label: '删除文件夹', icon: '🗑️', onClick: () => handleContextAction('delete-folder', node), danger: true },
