@@ -462,13 +462,6 @@ export function FileTree() {
         >
           {sortAsc ? '↑' : '↓'}
         </button>
-        <button
-          className="btn-icon sort-order-btn"
-          onClick={() => { setNewFolderParent(''); setNewFolderName(''); }}
-          title="新建文件夹"
-        >
-          📁+
-        </button>
       </div>
 
       {newFolderParent !== null && (
