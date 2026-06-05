@@ -263,7 +263,8 @@ export function FileTree() {
         toggleFolder(node.path);
         break;
       case 'new-folder': {
-        const parentDir = node.path.includes('/') ? node.path.split('/').slice(0, -1).join('/') : '';
+        const lastSep = Math.max(node.path.lastIndexOf('/'), node.path.lastIndexOf('\\'));
+        const parentDir = lastSep > 0 ? node.path.substring(0, lastSep) : '';
         setNewFolderParent(parentDir);
         setNewFolderName('');
         break;
