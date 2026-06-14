@@ -6,7 +6,7 @@ import path from 'node:path';
 import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { insertPaper, getOrCreateTag, setPaperAuthors } from '../services/database.js';
-import { parseNote, createNoteFromTemplate } from '../services/noteParser.js';
+import { parseNote, serializeNote } from '../services/noteParser.js';
 import { slugify } from '../utils/slugify.js';
 
 function isPathInVault(filePath: string, vaultPath: string): boolean {
@@ -284,7 +284,10 @@ export function registerFileIPC(getVaultPath: () => string, db: DatabaseType): v
         await fs.promises.mkdir(targetDir, { recursive: true });
 
         const notePath = uniqueFilePath(targetDir, slug, '.md');
-        const noteContent = createNoteFromTemplate({ title: title.trim(), tags: [], reading_status: 'to-read' });
+        const noteContent = serializeNote(
+          { title: title.trim(), tags: [], reading_status: 'to-read', rating: 0, citations: 0, added_date: new Date().toISOString() },
+          '',
+        );
         await fs.promises.writeFile(notePath, noteContent, 'utf-8');
 
         insertPaper(db, {
