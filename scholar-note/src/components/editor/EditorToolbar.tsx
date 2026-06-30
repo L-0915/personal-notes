@@ -23,6 +23,8 @@ const TOOLS: Array<{ label: string; title: string; before: string; after: string
 export function EditorToolbar({ editorRef }: EditorToolbarProps) {
   const showOutline = useUiStore((s) => s.showOutline);
   const toggleOutline = useUiStore((s) => s.toggleOutline);
+  const showBacklinks = useUiStore((s) => s.showBacklinks);
+  const setShowBacklinks = useUiStore((s) => s.setShowBacklinks);
   const viewMode = useUiStore((s) => s.viewMode);
   const setViewMode = useUiStore((s) => s.setViewMode);
   const setShowExport = useUiStore((s) => s.setShowExport);
@@ -66,6 +68,20 @@ export function EditorToolbar({ editorRef }: EditorToolbarProps) {
         onClick={toggleOutline}
       >
         ☰
+      </button>
+      <button
+        className={`toolbar-btn${showBacklinks ? ' active' : ''}`}
+        title="反向链接"
+        onClick={() => setShowBacklinks(!showBacklinks)}
+      >
+        🔗
+      </button>
+      <button
+        className={`toolbar-btn${viewMode === 'graph' ? ' active' : ''}`}
+        title="关系图谱"
+        onClick={() => setViewMode(viewMode === 'graph' ? 'preview' : 'graph')}
+      >
+        📊
       </button>
     </div>
   );

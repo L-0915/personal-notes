@@ -21,7 +21,11 @@ type MdToken = ReturnType<MarkdownIt['parse']>[number];
 
 // Shared markdown-it instance for export (same config as preview)
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true, breaks: true });
-md.use(footnote).use(taskLists).use(emoji).use(katex);
+md.use(footnote).use(taskLists).use(emoji).use(katex, {
+  throwOnError: false,
+  strict: false,
+  trust: true,
+});
 
 // ---------------------------------------------------------------------------
 // HTML Export

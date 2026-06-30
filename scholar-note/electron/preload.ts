@@ -81,6 +81,10 @@ const electronAPI = {
   // -- Export ---------------------------------------------------------------
   exportNote: (format: string, markdown: string, title: string) =>
     ipcRenderer.invoke('export:note', format, markdown, title),
+
+  // -- Links ----------------------------------------------------------------
+  getBacklinks: (title: string) => ipcRenderer.invoke('note:getBacklinks', title),
+  getLinkGraph: () => ipcRenderer.invoke('note:getLinkGraph'),
 };
 
 export type ElectronAPI = typeof electronAPI;

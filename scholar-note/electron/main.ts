@@ -17,6 +17,7 @@ import { registerPaperIPC } from './ipc/paperIPC.js';
 import { registerWatchIPC, closeWatcher } from './ipc/watchIPC.js';
 import { registerDbIPC } from './ipc/dbIPC.js';
 import { registerExportIPC } from './ipc/exportIPC.js';
+import { registerLinkIPC } from './ipc/linkIPC.js';
 import { initDatabase } from './services/database.js';
 
 // ---------------------------------------------------------------------------
@@ -217,6 +218,7 @@ app.whenReady().then(() => {
   registerVaultIPC();
   registerBackupIPC();
   registerExportIPC();
+  registerLinkIPC(() => vaultPath, db);
 
   // Create the main window
   createWindow();

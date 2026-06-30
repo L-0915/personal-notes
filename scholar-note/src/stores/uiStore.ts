@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 type Theme = 'light' | 'dark';
 export type SortBy = 'title' | 'updatedDate' | 'addedDate' | 'rating';
-export type ViewMode = 'preview' | 'edit';
+export type ViewMode = 'preview' | 'edit' | 'graph';
 
 interface UiState {
   theme: Theme;
@@ -14,6 +14,7 @@ interface UiState {
   sortAsc: boolean;
   searchFocusCounter: number;
   showOutline: boolean;
+  showBacklinks: boolean;
   viewMode: ViewMode;
 }
 
@@ -27,6 +28,7 @@ interface UiActions {
   setSidebarWidth: (width: number) => void;
   triggerSearchFocus: () => void;
   toggleOutline: () => void;
+  setShowBacklinks: (show: boolean) => void;
   setViewMode: (mode: ViewMode) => void;
 }
 
@@ -54,6 +56,7 @@ export const useUiStore = create<UiState & UiActions>((set, get) => ({
   sortAsc: false,
   searchFocusCounter: 0,
   showOutline: false,
+  showBacklinks: false,
   viewMode: 'preview' as ViewMode,
 
   toggleTheme: () => {
@@ -78,5 +81,6 @@ export const useUiStore = create<UiState & UiActions>((set, get) => ({
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   triggerSearchFocus: () => set((s) => ({ searchFocusCounter: s.searchFocusCounter + 1 })),
   toggleOutline: () => set((s) => ({ showOutline: !s.showOutline })),
+  setShowBacklinks: (show) => set({ showBacklinks: show }),
   setViewMode: (mode) => set({ viewMode: mode }),
 }));

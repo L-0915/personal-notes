@@ -8,6 +8,8 @@ import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import type { MarkdownPreviewHandle } from '@/components/editor/MarkdownPreview';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { OutlinePanel } from '@/components/editor/OutlinePanel';
+import { BacklinksPanel } from '@/components/editor/BacklinksPanel';
+import { GraphView } from '@/components/graph/GraphView';
 
 const URL_DOI_PATTERNS = [
   /https?:\/\/arxiv\.org\/(?:abs|pdf|html)\/\d+\.\d+(?:v\d+)?/gi,
@@ -40,6 +42,8 @@ export function AppLayout() {
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const showOutline = useUiStore((s) => s.showOutline);
   const toggleOutline = useUiStore((s) => s.toggleOutline);
+  const showBacklinks = useUiStore((s) => s.showBacklinks);
+  const setShowBacklinks = useUiStore((s) => s.setShowBacklinks);
   const viewMode = useUiStore((s) => s.viewMode);
   const setViewMode = useUiStore((s) => s.setViewMode);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,7 +191,18 @@ export function AppLayout() {
         {currentPaper ? (
           <>
             <EditorToolbar editorRef={editorRef} />
-            {viewMode === 'edit' ? (
+            {viewMode === 'graph' ? (
+              <GraphView
+                papers={papers}
+                onNavigate={(paper) => {
+                  setCurrentPaper(paper);
+                  window.electronAPI.readFile(paper.filePath).then((result) => {
+                    if (typeof result === 'string') setCurrentContent(result);
+                  }).catch(() => setCurrentContent(''));
+                  setViewMode('preview');
+                }}
+              />
+            ) : viewMode === 'edit' ? (
               <MarkdownEditor
                 ref={editorRef}
                 value={currentContent}
@@ -203,8 +218,30 @@ export function AppLayout() {
                   onLocalFileClick={handleLocalFileClick}
                   onNoteLinkClick={handleNoteLinkClick}
                   onScroll={handlePreviewScroll}
+                  papers={papers}
+                  onHoverNavigate={(paper) => {
+                    setCurrentPaper(paper);
+                    window.electronAPI.readFile(paper.filePath).then((result) => {
+                      if (typeof result === 'string') setCurrentContent(result);
+                    }).catch(() => setCurrentContent(''));
+                  }}
                 />
                 {showOutline && <OutlinePanel content={currentContent} onClose={() => toggleOutline()} />}
+                {showBacklinks && currentPaper && (
+                  <BacklinksPanel
+                    noteTitle={currentPaper.title}
+                    onNavigate={(filePath) => {
+                      const paper = papers.find((p) => p.filePath === filePath);
+                      if (paper) {
+                        setCurrentPaper(paper);
+                        window.electronAPI.readFile(filePath).then((result) => {
+                          if (typeof result === 'string') setCurrentContent(result);
+                        }).catch(() => setCurrentContent(''));
+                      }
+                    }}
+                    onClose={() => setShowBacklinks(false)}
+                  />
+                )}
               </div>
             )}
           </>

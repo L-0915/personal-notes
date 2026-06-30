@@ -164,3 +164,61 @@
   color: var(--text-secondary);
   font-size: 0.8rem;
 }
+
+/* KaTeX formula rendering */
+.markdown-preview .katex {
+  color: var(--text-primary);
+  font-size: 1.05em;
+}
+.markdown-preview .katex-error {
+  color: var(--danger);
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85em;
+}
+.markdown-preview .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+.markdown-preview .katex-display > .katex {
+  max-width: 100%;
+}
+
+/* KaTeX dark mode fixes */
+[data-theme="dark"] .markdown-preview .katex .mord,
+[data-theme="dark"] .markdown-preview .katex .mbin,
+[data-theme="dark"] .markdown-preview .katex .mrel,
+[data-theme="dark"] .markdown-preview .katex .mopen,
+[data-theme="dark"] .markdown-preview .katex .mclose,
+[data-theme="dark"] .markdown-preview .katex .mpunct,
+[data-theme="dark"] .markdown-preview .katex .minner,
+[data-theme="dark"] .markdown-preview .katex .mathrm,
+[data-theme="dark"] .markdown-preview .katex .mathbf,
+[data-theme="dark"] .markdown-preview .katex .mathit,
+[data-theme="dark"] .markdown-preview .katex .mathsf,
+[data-theme="dark"] .markdown-preview .katex .mathtt,
+[data-theme="dark"] .markdown-preview .katex .mathcal,
+[data-theme="dark"] .markdown-preview .katex .mathfrak,
+[data-theme="dark"] .markdown-preview .katex .mathbb,
+[data-theme="dark"] .markdown-preview .katex .mathscr,
+[data-theme="dark"] .markdown-preview .katex .mathnormal,
+[data-theme="dark"] .markdown-preview .katex .text,
+[data-theme="dark"] .markdown-preview .katex .textrm,
+[data-theme="dark"] .markdown-preview .katex .textsf,
+[data-theme="dark"] .markdown-preview .katex .texttt,
+[data-theme="dark"] .markdown-preview .katex .operatorname {
+  color: var(--text-primary);
+}
+[data-theme="dark"] .markdown-preview .katex .mfrac {
+  border-color: var(--text-primary);
+}
+[data-theme="dark"] .markdown-preview .katex .hline {
+  border-bottom-color: var(--text-primary);
+}
+[data-theme="dark"] .markdown-preview .katex .stretchy svg {
+  fill: var(--text-primary);
+  stroke: var(--text-primary);
+}

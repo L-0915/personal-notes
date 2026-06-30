@@ -1,4 +1,6 @@
-import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
+import type { Paper } from '@/types';
+import { HoverPreview } from './HoverPreview';
 import MarkdownIt from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import taskLists from 'markdown-it-task-lists';
@@ -13,6 +15,8 @@ interface MarkdownPreviewProps {
   onNoteLinkClick?: (noteTitle: string) => void;
   onScroll?: (fraction: number) => void;
   scrollFraction?: number;
+  papers?: Paper[];
+  onHoverNavigate?: (paper: Paper) => void;
 }
 
 export interface MarkdownPreviewHandle {
@@ -24,7 +28,7 @@ let mermaidCounter = 0;
 
 mermaid.initialize({
   startOnLoad: false,
-  theme: 'default',
+  theme: typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
   securityLevel: 'strict',
 });
 
@@ -35,7 +39,12 @@ const md = new MarkdownIt({
   breaks: true,
 });
 
-md.use(footnote).use(taskLists).use(emoji).use(katex);
+md.use(footnote).use(taskLists).use(emoji).use(katex, {
+  throwOnError: false,
+  strict: false,
+  trust: true,
+  errorColor: 'var(--danger)',
+});
 
 // Convert [[note title]] to wiki-link markdown syntax before rendering
 function preprocessWikiLinks(text: string): string {
@@ -89,11 +98,13 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
 };
 
 export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(
-  function MarkdownPreview({ content, onLocalFileClick, onNoteLinkClick, onScroll, scrollFraction }, ref) {
+  function MarkdownPreview({ content, onLocalFileClick, onNoteLinkClick, onScroll, scrollFraction, papers, onHoverNavigate }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onScrollRef = useRef(onScroll);
   onScrollRef.current = onScroll;
   const syncRef = useRef(false);
+  const [hoverPreview, setHoverPreview] = useState<{ title: string; rect: DOMRect } | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useImperativeHandle(ref, () => ({
     getScrollFraction: () => {
@@ -142,6 +153,30 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     [onLocalFileClick, onNoteLinkClick],
   );
 
+  const handleMouseOver = useCallback((e: MouseEvent) => {
+    const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-note-link]');
+    if (link) {
+      const title = link.getAttribute('data-note-link') ?? '';
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      setHoverPreview(null);
+      hoverTimerRef.current = setTimeout(() => {
+        setHoverPreview({ title, rect: link.getBoundingClientRect() });
+      }, 300);
+    } else {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      setHoverPreview(null);
+    }
+  }, []);
+
+  const handleMouseOut = useCallback((e: MouseEvent) => {
+    const relatedLink = (e.relatedTarget as HTMLElement)?.closest?.('a[data-note-link]') as HTMLAnchorElement | null;
+    const currentLink = (e.target as HTMLElement)?.closest?.('a[data-note-link]') as HTMLAnchorElement | null;
+    if (!relatedLink || relatedLink !== currentLink) {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      setHoverPreview(null);
+    }
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -180,6 +215,8 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     });
 
     container.addEventListener('click', handleClick);
+    container.addEventListener('mouseover', handleMouseOver);
+    container.addEventListener('mouseout', handleMouseOut);
 
     // Preview → Editor scroll sync
     const handlePreviewScroll = () => {
@@ -194,11 +231,27 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     return () => {
       container.removeEventListener('click', handleClick);
       container.removeEventListener('scroll', handlePreviewScroll);
+      container.removeEventListener('mouseover', handleMouseOver);
+      container.removeEventListener('mouseout', handleMouseOut);
     };
-  }, [content, handleClick]);
+  }, [content, handleClick, handleMouseOver, handleMouseOut]);
 
   return (
-    <div className="markdown-preview" ref={containerRef} />
+    <>
+      <div className="markdown-preview" ref={containerRef} />
+      {hoverPreview && papers && onHoverNavigate && (
+        <HoverPreview
+          title={hoverPreview.title}
+          rect={hoverPreview.rect}
+          papers={papers}
+          onNavigate={(paper) => {
+            setHoverPreview(null);
+            onHoverNavigate(paper);
+          }}
+          onClose={() => setHoverPreview(null)}
+        />
+      )}
+    </>
   );
   },
 );

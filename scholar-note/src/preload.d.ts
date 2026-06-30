@@ -42,6 +42,31 @@ export interface ElectronAPI {
   createFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
   renameFolder: (oldPath: string, newName: string) => Promise<{ success: boolean; error?: string }>;
   deleteFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
+  getBacklinks: (title: string) => Promise<BacklinkResult[]>;
+  getLinkGraph: () => Promise<LinkGraph>;
+}
+
+interface BacklinkResult {
+  title: string;
+  abstract: string | null;
+  year: number | null;
+  filePath: string;
+}
+
+interface LinkGraphNode {
+  id: number;
+  title: string;
+  filePath: string;
+}
+
+interface LinkGraphEdge {
+  source: string;
+  target: string;
+}
+
+interface LinkGraph {
+  nodes: LinkGraphNode[];
+  links: LinkGraphEdge[];
 }
 
 interface FileTreeNode {

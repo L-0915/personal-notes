@@ -1,0 +1,104 @@
+.backlinks-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 35%;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-light);
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  animation: backlinks-slide-up 0.2s ease-out;
+}
+@keyframes backlinks-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.backlinks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: 1;
+}
+.backlinks-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 3px 5px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: all var(--transition);
+}
+.backlinks-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+.backlinks-list {
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+}
+.backlinks-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+  border-bottom: 1px solid var(--border-light);
+}
+.backlinks-item:last-child {
+  border-bottom: none;
+}
+.backlinks-item:hover {
+  background: var(--bg-hover);
+}
+.backlinks-item-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backlinks-item-meta {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+.backlinks-item-snippet {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.backlinks-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.backlinks-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.backlinks-error {
+  padding: 16px;
+  text-align: center;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
